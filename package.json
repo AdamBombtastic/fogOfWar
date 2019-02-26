@@ -1,0 +1,10 @@
+{
+  "name": "FogOfWar",
+  "version": "0.0.1",
+  "description": "FogOfWar D&D Companion",
+  "dependencies": {
+    "express": "^4.16.3",
+    "socket.io": "^2.2.0",
+    "sqlite3": "^4.0.6"
+  }
+}

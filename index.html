@@ -1,0 +1,204 @@
+<!doctype html> 
+<html lang="en"> 
+<head> 
+	<meta charset="UTF-8" />
+	<title>Tap Mobile Game Demo</title>
+    <script src="phaser.min.js"></script>
+    <script type="text/javascript" src="UIManager.js"></script>
+    <script type="text/javascript" src="states/worldState.js"></script>
+    <script type="text/javascript" src="states/load.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="model.js"></script>
+    <script src="/client.js"></script>
+    <style type="text/css">
+        html {
+            background: linear-gradient(to bottom right, #553333, #997788) no-repeat;
+            height: 100%;
+        }
+        #formContainer {
+            margin: 0 auto;
+            width: fit-content;
+            height: fit-content;
+            background: linear-gradient(to bottom right, #ccc, #EEE) no-repeat;
+            
+            border-radius: 10px;
+            padding: 20px;
+            top: 50%;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+        #formContainer h3 {
+            font-size: 20px;
+            color: #444;
+            text-align: center;
+            width: inherit;
+            height: fit-content;
+            text-align: center;
+            margin: 0 auto;
+        }
+        #formContainer input {
+            display: block;
+            font-size: 14px;
+            color: #222;
+            margin: 2px;
+        }
+        #formContainer #btnContainer {
+            margin: 0 auto;
+            width:max-content;
+            height: fit-content;
+        }
+        #formContainer #btnContainer button {
+            background-color: #2b5678;
+            color: #FFF;
+            border-radius: 5px;
+            border: none;
+            padding: 5px;
+            font-size: 18px;
+            margin:2px;
+        }
+        #formContainer select {
+            display: block;
+            font-size: 14px;
+            color: #222;
+            margin: 2px;
+            width: 175px;
+        }
+        #infoBar {
+            display:inline-block;
+            width: 1334px;
+            margin: 0 0 0 0;
+            font-size: 24px;
+            font-family: sans-serif;
+            border-radius: 3px;
+            color: #444;
+            background: linear-gradient(to bottom right, #ccc, #EEE) no-repeat;
+        }
+        #infoBar h3 {
+            display:inline-block;
+            line-height: 40px;
+            margin: 0 auto;
+        }
+        #lblName {
+            width: 77%;
+        }
+        #infoBar img {
+            vertical-align: middle;
+            width: 40px;
+            height: 40px;
+            margin: 5px 5px 5px 5px;
+            padding: 0 0 0 0;
+        }
+        #mainDiv {
+            height: 100%;
+            width: 100%;
+        }
+        canvas {
+            border-radius: 5px;
+            box-shadow: #444 1px 2px 3px;
+        }
+    </style>
+</head>
+<body>
+    <div id="infoBar" hidden="true">
+        <img src="/graphics/ic_bard.png" width="60px" height="60px" id="imgIcon"></img>
+        <h3 id="lblName">Adam</h3>    
+        <h3 id="lblRoomCode">Room Code: 123</h3>
+    </div>
+    
+    <div id="gameDiv" hidden="true">
+        <script type="text/javascript" src="main.js"></script>
+    </div>
+    <div id="mainDiv">
+        <div id="formContainer">
+            <h3>Create or Join</h3>
+            <input type="text" id="nameInput" placeholder="Name"/>
+            <input type="text" id="roomInput" placeholder="Room Code"/>
+            <select id="classInput">
+                <option value="-1">Please select a class</option>
+                <option value="0">Bard</option>
+                <option value="1">Barbarian</option>
+                <option value="2">Cleric</option>
+                <option value="3">Druid</option>
+                <option value="4">Fighter</option>
+                <option value="5">Monk</option>
+                <option value="6">Paladin</option>
+                <option value="7">Ranger</option>
+                <option value="8">Rogue</option>
+                <option value="9">Sorcerer</option>
+                <option value="10">Warlock</option>
+                <option value="11">Wizard</option>
+            </select>
+            <div id="btnContainer"><button id="createBtn">Create</button><button id="joinBtn">Join</button></div>
+        </div>
+        <script type="text/javascript">
+            NetworkManager.connect();
+            function updateInfoBar(name,imageSrc,roomCode) {
+                var roomCodeLabel = document.getElementById("lblRoomCode");
+                roomCodeLabel.innerHTML = "Room Code: " + Model.roomCode;
+                var nameLabel = document.getElementById("lblName");
+                nameLabel.innerText = name;
+                var imgSrc = document.getElementById("imgIcon");
+                imgSrc.setAttribute("src",imageSrc);
+
+                document.getElementById("infoBar").setAttribute("style","display:inline-block;")
+            }
+            document.getElementById("infoBar").setAttribute("style","display:none;")
+            var Handler = {
+                hasView: true,
+                NetworkUpdate : function(event,data) {
+                    if (!this.hasView) return;
+                    console.log("Start Page : " + event);
+                
+                    if (event == EVENT_TYPES.create_room) {
+                        if (data != null && data.success != null) {
+                            if (data.success == true) {
+                                this.hasView = false;
+                                Model.playerId = data.id;
+                                Model.isOwner = data.isOwner == 1;
+                                Model.roomCode = data.roomCode;
+                                updateInfoBar(Model.getMyPlayer().name,"",Model.roomCode);
+                                startGame();
+                                
+                            }
+                            else {
+                                alert("Room already exists!");
+                            }
+                        }
+                    }
+                    else if (event == EVENT_TYPES.join_room) {
+                        if (data != null && data.success != null) {
+                            if (data.success == true) {
+                                this.hasView = false;
+                                Model.playerId = data.id;
+                                Model.isOwner = data.isOwner == 1;
+                                Model.roomCode = data.roomCode;
+                                updateInfoBar(Model.getMyPlayer().name,"",Model.roomCode);
+                                startGame();
+                            }
+                            else {
+                                alert("Room doesn't exist");
+                            }
+                         }
+                     }
+                    }
+                }
+            var createBtn = document.getElementById("createBtn");
+            var joinBtn = document.getElementById("joinBtn");
+
+            createBtn.onclick = () => {
+                var roomInput = document.getElementById("roomInput");
+                var nameInput = document.getElementById("nameInput");
+                var classInput = document.getElementById("classInput");
+                NetworkManager.tryCreateRoom({roomCode : roomInput.value, nameInput : nameInput.value, classInput : classInput.value});
+            }
+            joinBtn.onclick = () => {
+                var roomInput = document.getElementById("roomInput");
+                var nameInput = document.getElementById("nameInput");
+                var classInput = document.getElementById("classInput");
+                NetworkManager.tryJoinRoom({roomCode : roomInput.value, nameInput : nameInput.value, classInput : classInput.value});
+            }
+
+            NetworkManager.addObserver(Handler);
+        </script>
+    </div>
+</body>
+</html>
