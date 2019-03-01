@@ -1,6 +1,11 @@
 var PLAYER = {
     speed : 2,
 }
+const UIMODES = {
+    NONE : 0,
+    PING : 1,
+    EYE : 2,
+}
 var worldState = {
     hasView : true,
     mySprite : null,
@@ -10,7 +15,7 @@ var worldState = {
     fogMask : null,
     playerGroup : null,
     playerSpriteMap : {},
-    isPingMode : false,
+    uiMode : UIMODES.NONE, 
     pingFollower : null,
 
     generateWorldGrid: function(boxDimens=32) {
@@ -44,7 +49,7 @@ var worldState = {
         var players = Model.players;
         var playerSpriteMap = this.playerSpriteMap;
         var playerGroup = this.playerGroup;
-    
+        var myPlayer = Model.getMyPlayer();
         for (var i = 0; i < players.length; i++) {
             var player = players[i];
             var dimens = 64;
@@ -62,6 +67,8 @@ var worldState = {
             }
             playerSpriteMap[player.id].position.x = player.x;
             playerSpriteMap[player.id].position.y = player.y;
+
+            playerSpriteMap[player.id].visible = myPlayer.visibilityMap[player.id] == 1;
             
             if (Model.playerId == player.id || Model.isOwner) {
                 playerSpriteMap[player.id].input.enableDrag(true);
@@ -69,6 +76,13 @@ var worldState = {
                 playerSpriteMap[player.id].events.onDragStop.add(function(sprite,pointer) {
                         NetworkManager.tryMovePlayer({id:sprite.playerId,x:sprite.position.x,y:sprite.position.y});
                 },this);
+                playerSpriteMap[player.id].events.onInputDown.removeAll();
+                playerSpriteMap[player.id].events.onInputDown.add(function(sprite,pointer) {
+                    if (worldState.uiMode == UIMODES.EYE) {
+                        worldState.showVisibilityDialog(sprite.playerId);
+                    }
+                });
+                playerSpriteMap[player.id].visible = 1;
             }//player is local player
             else {
                 playerSpriteMap[player.id].mask = this.fog;
@@ -116,22 +130,35 @@ var worldState = {
 
        var ctrlKey = game.input.keyboard.addKey(Phaser.Keyboard.CONTROL);
        ctrlKey.onDown.add(function() {
-            worldState.isPingMode = true;
+            //worldState.isPingMode = !worldState.isPingMode;
             //console.log(worldState.isPingMode);
        });
        ctrlKey.onUp.add(function() {
-            worldState.isPingMode = false;
+           if (worldState.uiMode == UIMODES.PING) {
+               worldState.uiMode = UIMODES.NONE;
+           }
+           else worldState.uiMode = UIMODES.PING;
             //console.log(worldState.isPingMode);
-       });
+       },this);
 
-       this.pingFollower = game.add.sprite(0,0,"ic_ping");
+       var vKey = game.input.keyboard.addKey(Phaser.Keyboard.V);
+       vKey.onUp.add(function() {
+            worldState.uiMode = (worldState.uiMode == UIMODES.EYE) ? UIMODES.NONE : UIMODES.EYE;
+       },this);
+
+       this.pingFollower = game.add.sprite(0,0,SPRITE_KEYS.ic_ping);
        this.pingFollower.width = 40;
        this.pingFollower.height = 40;
+
+       this.eyeFollower = game.add.sprite(0,0,SPRITE_KEYS.ic_eye);
+       this.eyeFollower.width = 40;
+       this.eyeFollower.height = 40;
+       this.eyeFollower.tint = 0x22BB33;
 
        //this.backgroundWorld.inputEnabled = true;
        //this.backgroundWorld.events.onInputDown.add(function() {
            document.onclick = function() {
-            if (worldState.isPingMode){
+            if (worldState.uiMode == UIMODES.PING){
                 NetworkManager.tryPingMap({x:game.input.mousePointer.worldX,y:game.input.mousePointer.worldY});
             } //worldState.createPingAnimation(game.input.mousePointer.worldX,game.input.mousePointer.worldY);
            }
@@ -142,7 +169,8 @@ var worldState = {
 
     update : function() {
         this.mousePos = {x: game.input.mousePointer.x, y: game.input.mousePointer.y};
-        this.pingFollower.alpha = worldState.isPingMode ? 1 : 0;
+        this.pingFollower.alpha = worldState.uiMode == UIMODES.PING ? 1 : 0;
+        this.eyeFollower.alpha = worldState.uiMode == UIMODES.EYE ? 1 : 0;
         var threshold = 8;
         if (this.mousePos.x <= threshold) {
             var diff = Math.abs(this.mousePos.x);
@@ -167,6 +195,9 @@ var worldState = {
         this.pingFollower.centerX = game.input.mousePointer.worldX;
         this.pingFollower.centerY = game.input.mousePointer.worldY;
 
+        this.eyeFollower.centerX = game.input.mousePointer.worldX;
+        this.eyeFollower.centerY = game.input.mousePointer.worldY;
+
        
     },
     NetworkUpdate : function(event, data) {
@@ -184,6 +215,51 @@ var worldState = {
                 worldState.createPingAnimation(data.x,data.y);
             }
         }
+    },
+    showVisibilityDialog : function(playerId) {
+        var formDiv = document.getElementById("visibilityForm");
+        formDiv.hidden = false;
+        var title = document.getElementById("uiFormTitle");
+        const player = Model.getPlayerWithId(playerId);
+        title.innerText = player.name + " can see . . .";
+        var checkBoxDiv = document.getElementById("playerOptionsList")
+        checkBoxDiv.innerHTML = "";
+        
+
+        for (var k in player.visibilityMap) {
+            const tempId = k;
+            const tempVis = player.visibilityMap[k] == 1;
+
+            var tempPlayer = Model.getPlayerWithId(tempId);
+
+            var ele = document.createElement("p");
+            ele.innerText = tempPlayer.name;
+
+            var check = document.createElement("input");
+            check.id = "chkPlayer_"+tempId;
+            check.setAttribute("type","checkbox");
+            check.checked = tempVis;
+
+            check.onchange = function(e) {
+                var box = e.target;
+                var checked = e.target.checked;
+                player.visibilityMap[tempId] = checked ? 1 : 0;
+            }
+
+            ele.appendChild(check);
+
+            checkBoxDiv.appendChild(ele);
+        }
+
+        var doneBtn = document.getElementById("btnFormDone");
+        doneBtn.onclick = function() {
+            var formDiv = document.getElementById("visibilityForm");
+            formDiv.hidden=true;
+            var checkBoxDiv = document.getElementById("playerOptionsList")
+            checkBoxDiv.innerHTML = "";
+            NetworkManager.tryUpdateVisibility({playerId:playerId,visibilityMap:player.visibilityMap});
+        }
+
     },
 
 }

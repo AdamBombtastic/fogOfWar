@@ -1,1 +1,1 @@
-http-server .
+node server

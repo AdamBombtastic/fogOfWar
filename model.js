@@ -18,6 +18,15 @@ var Model = {
             }
         }
         return {};
+    },
+    getPlayerWithId : (passedId) => {
+        for (var i = 0; i < Model.players.length; i++) {
+            var player = Model.players[i];
+            if (player.id == passedId) {
+                return player;
+            }
+        }
+        return {};
     }
 }
 

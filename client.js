@@ -3,7 +3,8 @@ const EVENT_TYPES = {
     join_room : "join_room",
     move_player : "move_player",
     room_update : "room_update",
-    ping_map : "ping_map"
+    ping_map : "ping_map",
+    update_visibility : "update_visibility"
   }
   
 var NetworkManager = {
@@ -71,6 +72,11 @@ var NetworkManager = {
         if (this.isConnected) {
             //console.log(data);
             this.socket.emit(EVENT_TYPES.ping_map,{data:data});
+        }
+    },
+    tryUpdateVisibility(data) {
+        if (this.isConnected) {
+            this.socket.emit(EVENT_TYPES.update_visibility,{data:data});
         }
     }
 }

@@ -95,6 +95,44 @@
             border-radius: 5px;
             box-shadow: #444 1px 2px 3px;
         }
+        .UIForm {
+            margin: 0 auto;
+            background: #BBB;
+            width: 300px;
+            height: fit-content;
+            font-family: sans-serif;
+            color: #222;
+            border-radius: 5px;
+            position: absolute;
+            top: 30%;
+            left: 45%;
+
+        }
+        .UIForm h3 {
+            margin: 0 0 0 0 ;
+            height: fit-content;
+            text-align: start;
+            color: #444;
+            background: linear-gradient(to bottom right, #ccc, #EEE) no-repeat;
+            width: 100%;
+            font-size: 18px;
+            border-radius: 5px;
+            padding: 5px 0px 5px 0px;
+        }
+        .UIForm button {
+            background-color: #2b5678;
+            color: #FFF;
+            border-radius: 5px;
+            border: none;
+            padding: 5px;
+            font-size: 18px;
+            margin:0 auto;
+            text-align: center;
+            margin-left: 5px;
+        }
+        .UIForm p {
+            margin-left: 5px;
+        }
     </style>
 </head>
 <body>
@@ -128,6 +166,14 @@
                 <option value="11">Wizard</option>
             </select>
             <div id="btnContainer"><button id="createBtn">Create</button><button id="joinBtn">Join</button></div>
+        </div>
+        <div class="UIForm" id="visibilityForm" hidden="true">
+            <h3 id="uiFormTitle">Kanan can see . . .</h3>
+            <div id="playerOptionsList">
+                <p><input type="checkbox" id="chkPlayer_1"/>Adam</p>
+                <p><input type="checkbox" id="chkPlayer_3"/>Aric</p>
+            </div>
+            <button id="btnFormDone">Done</button>
         </div>
         <script type="text/javascript">
             NetworkManager.connect();

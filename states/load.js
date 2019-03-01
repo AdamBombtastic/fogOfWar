@@ -12,6 +12,7 @@ var SPRITE_KEYS = {
     ic_warlock : "ic_warlock",
     ic_wizard : "ic_wizard",
     ic_ping : "ic_ping",
+    ic_eye : "ic_eye",
     map_test : "map_test",
 }
 function classIdToSpriteKey(id) {
@@ -78,6 +79,7 @@ var loadState =  {
         game.load.image("ic_wizard", "./graphics/ic_bard.png");
         game.load.image("map_test","/graphics/map_test.jpg");
         game.load.image("ic_ping","/graphics/ic_ping.png");
+        game.load.image("ic_eye","/graphics/ic_eye.png");
 
     },
         

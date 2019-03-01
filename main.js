@@ -9,7 +9,7 @@ function startGame() {
     game.state.start("load");
 
     document.getElementById("gameDiv").hidden = false;
-    document.getElementById("mainDiv").hidden = true;
+    document.getElementById("formContainer").hidden = true;
 }
 
 //var clientWidth = function () {  return Math.max(window.innerWidth, document.documentElement.clientWidth);};

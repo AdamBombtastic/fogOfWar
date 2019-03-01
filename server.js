@@ -9,7 +9,8 @@ const EVENT_TYPES = {
   join_room : "join_room",
   move_player : "move_player",
   room_update : "room_update",
-  ping_map : "ping_map"
+  ping_map : "ping_map",
+  update_visibility : "update_visibility"
 }
 
 const express= require('express')
@@ -44,6 +45,10 @@ var roomTableSQL = "CREATE TABLE IF NOT EXISTS Room " +
 
 var playerTableSQL = "CREATE TABLE IF NOT EXISTS Player " +
 "(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, room INTEGER, x INTEGER NOT NULL DEFAULT 0, y INTEGER NOT NULL DEFAULT 0, bIsOwner INTEGER DEFAULT 0, playerClass INTEGER DEFAULT 0, bIsOnline INTEGER DEFAULT 0)";
+
+var visibilityTableSQL = "CREATE TABLE IF NOT EXISTS Visibility" + 
+"(id INTEGER PRIMARY KEY AUTOINCREMENT, viewerId INTEGER NOT NULL, playerId INTEGER NOT NULL, bIsVisible INTEGER NOT NULL DEFAULT 0)"
+
 //TODO: REFACTOR THIS
 function createTable(tableSQL,tableName) {
 db.run(tableSQL,(err) => {
@@ -56,6 +61,7 @@ else console.log(err);
 
 createTable(roomTableSQL,"Room");
 createTable(playerTableSQL,"Player");
+createTable(visibilityTableSQL,"Visibility");
 
 
 //#region SQL UTILITY
@@ -109,6 +115,7 @@ function updateSqlFromObject(tablename,obj) {
       var value = obj[key];
       if (value == null || value == undefined) continue;
       if (key == "id") continue;
+      if (key == "visibilityMap") continue;
       if (typeof value == "string") {
         returnSQL += key + "=" + " '" + value + "',";
       }
@@ -180,9 +187,52 @@ async function getAllPlayersInRoom(roomId) {
   if (DEBUG) console.log(sql);
   var rows = await query(sql);
   if (rows != null && rows.length > 0) {
+    for (var i =0; i < rows.length; i++) {
+      var row = rows[i];
+      row["visibilityMap"] = await getPlayerVisibilityMap(row.id);
+    }
     return rows;
   }
   return [];
+}
+
+async function postNewPlayerVisibility(roomId, playerId) {
+  var temp = await getAllPlayersInRoom(roomId);
+  var success = true;
+  for (var i = 0; i < temp.length; i++) {
+    var tempPlayer = temp[i];
+    if (tempPlayer.id != playerId) {
+      var sql = "INSERT INTO Visibility (viewerId,playerId) VALUES ("+tempPlayer.id+","+playerId+")";
+      if (DEBUG) console.log(sql);
+      success = await insert(sql) && success;
+      var sql = "INSERT INTO Visibility (viewerId,playerId) VALUES ("+playerId+","+tempPlayer.id+")";
+      if (DEBUG) console.log(sql);
+      success = await insert(sql) && success;
+    }
+  }
+  return success;
+}
+async function updatePlayerVisibility(viewerId, playerId, visibility) {
+  var sql = "UPDATE Visibility SET bIsVisible=" + visibility + " WHERE viewerId="+viewerId+" AND playerId="+playerId;
+  if (DEBUG) console.log(sql);
+  return await insert(sql);
+}
+async function updatePlayerVisibilityFromMap(viewerId, visMap) {
+  success = true;
+  for (var k in visMap) {
+    success = success && await updatePlayerVisibility(viewerId,k,visMap[k]);
+  }
+  return success;
+}
+async function getPlayerVisibilityMap(viewerId) {
+  var sql = "SELECT playerId, bIsVisible FROM Visibility WHERE viewerId="+viewerId;
+  if (DEBUG) console.log(sql);
+  var results = await query(sql);
+  var ans = {};  
+  for (var i = 0; i < results.length; i++) {
+    ans[results[i].playerId] = results[i].bIsVisible;
+  }
+  return ans;
 }
 //#endregion
 /** 
@@ -234,6 +284,8 @@ http.listen(PORT, function(){
             success = success && await postNewPlayer(nameInput,roomCode,classInput,true);
             if (success) {
               users[socket.id].player = await getPlayerFromNameAndCode(nameInput,roomCode);
+              await postNewPlayerVisibility(users[socket.id].player.room,users[socket.id].player.id);
+              users[socket.id].player.visibilityMap = getPlayerVisibilityMap(users[socket.id].player.id);
               rooms[users[socket.id].player.room] = {players : []};
               rooms[users[socket.id].player.room].players.push( users[socket.id].player);
             }
@@ -268,7 +320,11 @@ http.listen(PORT, function(){
                 success = await postNewPlayer(nameInput,roomCode,classInput);
               }
               if (success) {
-                playerObj = (playerObj == null) ? await getPlayerFromNameAndCode(nameInput, roomCode) : playerObj;
+                if (playerObj == null) {
+                  playerObj = await getPlayerFromNameAndCode(nameInput, roomCode);
+                  success = await postNewPlayerVisibility(playerObj.room,playerObj.id);
+                }
+                playerObj.visibilityMap = getPlayerVisibilityMap(playerObj.id);
                 users[socket.id].player = playerObj;
                 refreshRoomInstance(playerObj.room);
               }
@@ -287,6 +343,19 @@ http.listen(PORT, function(){
           sendToRoom(roomId);
         })();
       }); 
+      socket.on(EVENT_TYPES.update_visibility, (message) => {
+        if (DEBUG) console.log("RECIEVED : " + EVENT_TYPES.update_visibility + " : " + message);
+        (async () => {
+          var roomId = users[socket.id].player.room;
+          var player = users[socket.id].player;
+          var target = message.data.playerId;
+          var visMap = message.data.visibilityMap;
+          if (player.bIsOwner) {
+            success = setPlayerVisibility(roomId,target,visMap);
+            if (success) sendToRoom(roomId);
+          }
+        })();
+      });
       socket.on(EVENT_TYPES.ping_map, (message) => {
         if (DEBUG) console.log("RECIEVED : " + EVENT_TYPES.ping_map + " : " + message);
         console.log(message);
@@ -325,6 +394,7 @@ http.listen(PORT, function(){
      for (var i = 0; i < room.players.length;i++) {
         var player = room.players[i];
         await updatePlayer(player);
+        await updatePlayerVisibilityFromMap(player.id,player.visibilityMap);
      }
      
    }
@@ -347,6 +417,18 @@ function movePlayerToSpot(roomId,playerId,spot) {
       }
     }
     return false;
+ }
+ function setPlayerVisibility(roomId,playerId,visMap) {
+  if (rooms[roomId] != null) {
+    var players = rooms[roomId].players;
+    for (var i = 0; i < players.length; i++) {
+      if (players[i].id == playerId) {
+        players[i].visibilityMap = visMap;
+        return true;
+      }
+    }
+  }
+  return false;
  }
  function sendToRoom(roomId) {
    var clients = io.sockets.clients().sockets;
