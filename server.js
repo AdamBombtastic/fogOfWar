@@ -1,5 +1,6 @@
 /*
-  TODO: Add selective visibility interface for the DM
+  TODO: 
+        Add 
         Online-Offline indicators for players.
         Maybe, eventually do character select.
 */
@@ -41,7 +42,7 @@ var db = new sqlite.Database("./db/database.db",sqlite.OPEN_READWRITE | sqlite.O
 });
 
 var roomTableSQL = "CREATE TABLE IF NOT EXISTS Room " +
-"(id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT, isActive INTEGER NOT NULL DEFAULT 1)";
+"(id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT, isActive INTEGER NOT NULL DEFAULT 1, mapId INTEGER NOT NULL DEFAULT 0)";
 
 var playerTableSQL = "CREATE TABLE IF NOT EXISTS Player " +
 "(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, room INTEGER, x INTEGER NOT NULL DEFAULT 0, y INTEGER NOT NULL DEFAULT 0, bIsOwner INTEGER DEFAULT 0, playerClass INTEGER DEFAULT 0, bIsOnline INTEGER DEFAULT 0)";
@@ -149,13 +150,22 @@ async function getRoomIdFromCode(roomCode) {
   }
   return null;
 }
+async function getRoomFromId(roomId) {
+  var sql = "SELECT * from Room where id="+roomId+";"
+  if (DEBUG) console.log(sql);
+  var rows = await query(sql);
+  if (rows != null && rows.length > 0) {
+    return rows[0].id;
+  }
+  return null;
+}
 async function checkIfRoomTaken(roomCode) {
   var ans = await getRoomIdFromCode(roomCode);
   return ans != null;
 }
 
-async function postRoom(roomCode) {
-  var sql = insertSqlFromObject("Room",{isActive : 1, code : roomCode});
+async function postRoom(roomCode,mapId) {
+  var sql = insertSqlFromObject("Room",{isActive : 1, code : roomCode, mapId : mapId});
   if (DEBUG) console.log(sql);
   return await(insert(sql));
 }
@@ -276,11 +286,11 @@ http.listen(PORT, function(){
         roomCode = (message != null && message.data != null) ? message.data.roomCode : null;
         nameInput = (message != null && message.data != null) ? message.data.nameInput : null;
         classInput = (message != null && message.data != null) ? message.data.classInput : -1;
-
+        mapInput = (message != null && message.data != null) ? message.data.mapInput : 0;
         if (roomCode != null && nameInput != null) {
           var taken = await checkIfRoomTaken();
           if (!taken) {
-            success = await postRoom(roomCode);
+            success = await postRoom(roomCode,mapInput);
             success = success && await postNewPlayer(nameInput,roomCode,classInput,true);
             if (success) {
               users[socket.id].player = await getPlayerFromNameAndCode(nameInput,roomCode);
@@ -288,13 +298,14 @@ http.listen(PORT, function(){
               users[socket.id].player.visibilityMap = getPlayerVisibilityMap(users[socket.id].player.id);
               rooms[users[socket.id].player.room] = {players : []};
               rooms[users[socket.id].player.room].players.push( users[socket.id].player);
+              rooms[users[socket.id].player.room].mapId = mapInput;
             }
           }
         }
         else {
           success = false;
         }
-        socket.emit(EVENT_TYPES.create_room,{success:success,id: users[socket.id].player.id,isOwner:users[socket.id].player.bIsOwner, roomCode : roomCode});
+        socket.emit(EVENT_TYPES.create_room,{success:success,id: users[socket.id].player.id,isOwner:users[socket.id].player.bIsOwner, roomCode : roomCode, mapId : mapInput});
       })();
       });
       socket.on(EVENT_TYPES.join_room, (message) => {
@@ -333,7 +344,7 @@ http.listen(PORT, function(){
           else {
             success = false;
           }
-          socket.emit(EVENT_TYPES.join_room,{success:success,id: users[socket.id].player.id, isOwner:users[socket.id].player.bIsOwner, roomCode:roomCode});
+          socket.emit(EVENT_TYPES.join_room,{success:success,id: users[socket.id].player.id, isOwner:users[socket.id].player.bIsOwner, roomCode:roomCode,mapId:rooms[users[socket.id].player.room].mapId});
         })();
       });
       socket.on(EVENT_TYPES.room_update, (message) => {
@@ -391,6 +402,7 @@ http.listen(PORT, function(){
    if (rooms[roomId] != null) {
      //Save existing players
      var room = rooms[roomId];
+     var map = rooms[roomId].mapId;
      for (var i = 0; i < room.players.length;i++) {
         var player = room.players[i];
         await updatePlayer(player);
@@ -402,6 +414,7 @@ http.listen(PORT, function(){
     rooms[roomId] = {};
     rooms[roomId].sockets = [];
    }
+   rooms[roomId].map = await getRoomFromId(roomId).map;
    rooms[roomId].players = await getAllPlayersInRoom(roomId);
  }
  

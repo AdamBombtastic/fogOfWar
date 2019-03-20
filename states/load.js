@@ -64,6 +64,11 @@ var loadState =  {
             loadingLabel.text = "Done!";
         },this);
 
+        for (var i = 0; i < MapManager.maps.length; i++) {
+            var tempMap = MapManager.maps[i];
+            game.load.image(tempMap.key,tempMap.fileName);
+        }
+
         //TODO: Generify this for when we allow uploaded tokens.
         game.load.image("ic_bard", "./graphics/ic_bard.png");
         game.load.image("ic_barbarian", "./graphics/ic_barbarian.png");

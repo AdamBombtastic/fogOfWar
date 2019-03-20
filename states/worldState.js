@@ -1,3 +1,7 @@
+//V = GM Visibility Tool
+//T = GM Toggle Fog of War Circles
+// Ctrl = Ping
+
 var PLAYER = {
     speed : 2,
 }
@@ -17,11 +21,12 @@ var worldState = {
     playerSpriteMap : {},
     uiMode : UIMODES.NONE, 
     pingFollower : null,
+    showVisibilityCircles : true,
 
     generateWorldGrid: function(boxDimens=32) {
         var tempGraphics = game.add.graphics(0,0);
-        var width = Math.floor(game.world.width/boxDimens);
-        var height = Math.floor(game.world.height/boxDimens); 
+        var width = Math.ceil(game.world.width/boxDimens);
+        var height = Math.ceil(game.world.height/boxDimens); 
         for (var i = 0; i < width; i++) {
             for (var j = 0; j < height; j++) {
                 tempGraphics.lineStyle(1,"#111111");
@@ -52,23 +57,35 @@ var worldState = {
         var myPlayer = Model.getMyPlayer();
         for (var i = 0; i < players.length; i++) {
             var player = players[i];
-            var dimens = 64;
+            var dimens = Model.getCurrentMap().gridSize;
             if (playerSpriteMap[player.id] == null) {
                 playerSpriteMap[player.id] = playerGroup.create(0,0,classIdToSpriteKey(player.playerClass));
-                playerSpriteMap[player.id].textObj = game.add.text(0,0,player.name,{font: "64px Arial", fill: "#f47a42"});
-                playerSpriteMap[player.id].textObj.centerX = playerSpriteMap[player.id].x;
-                playerSpriteMap[player.id].textObj.centerY = playerSpriteMap[player.id].y-((dimens*2)+32);
+                playerSpriteMap[player.id].textObj = game.add.text(0,0,player.name,{font: "68px Arial", fill: "#222222"});
+                playerSpriteMap[player.id].textObj.centerX = playerSpriteMap[player.id].x-4;
+                playerSpriteMap[player.id].textObj.centerY = (playerSpriteMap[player.id].y-((dimens*2)+32))-4;
+                playerSpriteMap[player.id].textObj2 = game.add.text(0,0,player.name,{font: "64px Arial", fill: "#EEEEEE"});
+                playerSpriteMap[player.id].textObj2.centerX = playerSpriteMap[player.id].x;
+                playerSpriteMap[player.id].textObj2.centerY = playerSpriteMap[player.id].y-((dimens*2)+32);
                 playerSpriteMap[player.id].addChild(playerSpriteMap[player.id].textObj);
+                playerSpriteMap[player.id].addChild(playerSpriteMap[player.id].textObj2);
                 playerSpriteMap[player.id].width = dimens;
                 playerSpriteMap[player.id].height = dimens;
                 playerSpriteMap[player.id].anchor.setTo(0.5,0.5);
                 playerSpriteMap[player.id].inputEnabled = true;
                 playerSpriteMap[player.id].playerId = player.id;
+
+                playerSpriteMap[player.id].circleObj = game.add.graphics(0,0);
+                playerSpriteMap[player.id].circleObj.lineStyle(8,0x8b0000);
+                playerSpriteMap[player.id].circleObj.drawCircle(0,0,640*4);
+                //playerSpriteMap[player.id].circleObj.width = playerSpriteMap[player.id].width;
+                playerSpriteMap[player.id].addChild(playerSpriteMap[player.id].circleObj);
             }
             playerSpriteMap[player.id].position.x = player.x;
             playerSpriteMap[player.id].position.y = player.y;
 
             playerSpriteMap[player.id].visible = myPlayer.visibilityMap[player.id] == 1;
+
+            playerSpriteMap[player.id].circleObj.visible = (Model.isOwner && worldState.showVisibilityCircles);
             
             if (Model.playerId == player.id || Model.isOwner) {
                 playerSpriteMap[player.id].input.enableDrag(true);
@@ -94,11 +111,12 @@ var worldState = {
         game.stage.backgroundColor = UIColors.lightGreen;
         game.stage.disableVisibilityChange = true;
         
-        this.background = game.add.sprite(0,0,"map_test");
-        this.background.scale.setTo(5,5);
-
+        this.background = game.add.sprite(0,0,Model.getCurrentMap().key);
+        //this.background.scale.setTo(5,5);
+        this.background.width = Model.getCurrentMap().width;
+        this.background.height = Model.getCurrentMap().height;
         game.world.setBounds(0,0,this.background.width, this.background.height);
-        var dimens = 64;
+        var dimens = Model.getCurrentMap().gridSize;
     
         
         this.fogMask = game.add.graphics(0,0);
@@ -107,8 +125,10 @@ var worldState = {
 
         this.fogMask = game.add.sprite(0,0,this.fogMask.generateTexture());
 
-        this.backgroundWorld = game.add.sprite(0,0,"map_test");
-        this.backgroundWorld.scale.setTo(5,5);
+        this.backgroundWorld = game.add.sprite(0,0,Model.getCurrentMap().key);
+        //this.backgroundWorld.scale.setTo(5,5);
+        this.backgroundWorld.width = Model.getCurrentMap().width;
+        this.backgroundWorld.height = Model.getCurrentMap().height;
 
         var gridSprite = this.generateWorldGrid(dimens);
         
@@ -146,6 +166,11 @@ var worldState = {
             worldState.uiMode = (worldState.uiMode == UIMODES.EYE) ? UIMODES.NONE : UIMODES.EYE;
        },this);
 
+       var tKey = game.input.keyboard.addKey(Phaser.Keyboard.T);
+       tKey.onUp.add(function() {
+           worldState.setShowVisibilityCircles(!worldState.showVisibilityCircles);
+       });
+
        this.pingFollower = game.add.sprite(0,0,SPRITE_KEYS.ic_ping);
        this.pingFollower.width = 40;
        this.pingFollower.height = 40;
@@ -163,7 +188,8 @@ var worldState = {
             } //worldState.createPingAnimation(game.input.mousePointer.worldX,game.input.mousePointer.worldY);
            }
         
-     
+      game.camera.x = this.playerSpriteMap[Model.playerId].centerX - (game.camera.width/2);
+      game.camera.y = this.playerSpriteMap[Model.playerId].centerY - (game.camera.height/2);
        
     },
 
@@ -215,6 +241,10 @@ var worldState = {
                 worldState.createPingAnimation(data.x,data.y);
             }
         }
+    },
+    setShowVisibilityCircles(val) {
+        worldState.showVisibilityCircles = val;
+        worldState.renderPlayers();
     },
     showVisibilityDialog : function(playerId) {
         var formDiv = document.getElementById("visibilityForm");

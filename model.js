@@ -1,15 +1,9 @@
 var Model = {
-    map : {
-        width: 0, 
-        height : 0,
-        scaleX : 1,
-        savelY : 1,
-        imageURL : "",
-    },
     players : [],
     playerId : 0,
     isOwner : false,
     roomCode : "",
+    selectedMap : 0,
     getMyPlayer : () => {
         for (var i = 0; i < Model.players.length; i++) {
             var player = Model.players[i];
@@ -27,6 +21,9 @@ var Model = {
             }
         }
         return {};
+    },
+    getCurrentMap : () => {
+        return MapManager.maps[Model.selectedMap];
     }
 }
 

@@ -2,13 +2,14 @@
 <html lang="en"> 
 <head> 
 	<meta charset="UTF-8" />
-	<title>Tap Mobile Game Demo</title>
+	<title>Fog Of War</title>
     <script src="phaser.min.js"></script>
     <script type="text/javascript" src="UIManager.js"></script>
     <script type="text/javascript" src="states/worldState.js"></script>
     <script type="text/javascript" src="states/load.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script src="model.js"></script>
+    <script src="MapManager.js"></script>
     <script src="/client.js"></script>
     <style type="text/css">
         html {
@@ -87,6 +88,19 @@
             margin: 5px 5px 5px 5px;
             padding: 0 0 0 0;
         }
+        #infoBar input {
+            display: inline-block;
+            margin: 0 0 0 0;
+            padding: 0 0 0 0;
+            width: fit-content;
+            min-width: 26px;
+            height: 26px;
+            text-align: center;
+            margin-left: 20px;
+        }
+        #infoBar button:hover {
+            opacity: 0.5;
+        }
         #mainDiv {
             height: 100%;
             width: 100%;
@@ -133,6 +147,7 @@
         .UIForm p {
             margin-left: 5px;
         }
+
     </style>
 </head>
 <body>
@@ -165,6 +180,9 @@
                 <option value="10">Warlock</option>
                 <option value="11">Wizard</option>
             </select>
+            <select id="mapInput">
+
+            </select>
             <div id="btnContainer"><button id="createBtn">Create</button><button id="joinBtn">Join</button></div>
         </div>
         <div class="UIForm" id="visibilityForm" hidden="true">
@@ -177,6 +195,17 @@
         </div>
         <script type="text/javascript">
             NetworkManager.connect();
+            function updateMapDropDown() {
+                var mapSelect = document.getElementById("mapInput");
+                for (var i = 0; i < MapManager.maps.length; i++) {
+                    var tempMap = MapManager.maps[i];
+                    var optionObject = document.createElement("option");
+                    optionObject.setAttribute("value",i);
+                    optionObject.innerText=tempMap.name;
+                    mapSelect.appendChild(optionObject);
+                }
+            }
+            updateMapDropDown();
             function updateInfoBar(name,imageSrc,roomCode) {
                 var roomCodeLabel = document.getElementById("lblRoomCode");
                 roomCodeLabel.innerHTML = "Room Code: " + Model.roomCode;
@@ -201,6 +230,7 @@
                                 Model.playerId = data.id;
                                 Model.isOwner = data.isOwner == 1;
                                 Model.roomCode = data.roomCode;
+                                Model.selectedMap = data.mapId;
                                 updateInfoBar(Model.getMyPlayer().name,"",Model.roomCode);
                                 startGame();
                                 
@@ -217,6 +247,7 @@
                                 Model.playerId = data.id;
                                 Model.isOwner = data.isOwner == 1;
                                 Model.roomCode = data.roomCode;
+                                Model.selectedMap = data.mapId;
                                 updateInfoBar(Model.getMyPlayer().name,"",Model.roomCode);
                                 startGame();
                             }
@@ -234,7 +265,8 @@
                 var roomInput = document.getElementById("roomInput");
                 var nameInput = document.getElementById("nameInput");
                 var classInput = document.getElementById("classInput");
-                NetworkManager.tryCreateRoom({roomCode : roomInput.value, nameInput : nameInput.value, classInput : classInput.value});
+                var mapInput = document.getElementById("mapInput");
+                NetworkManager.tryCreateRoom({roomCode : roomInput.value, nameInput : nameInput.value, classInput : classInput.value, mapInput : mapInput.value});
             }
             joinBtn.onclick = () => {
                 var roomInput = document.getElementById("roomInput");
